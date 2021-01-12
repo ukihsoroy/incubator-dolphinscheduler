@@ -30,6 +30,7 @@ import org.apache.dolphinscheduler.dao.entity.Command;
 import org.apache.dolphinscheduler.dao.entity.ProcessDefinition;
 import org.apache.dolphinscheduler.dao.entity.ProcessInstance;
 import org.apache.dolphinscheduler.dao.entity.ProcessInstanceMap;
+import org.apache.dolphinscheduler.dao.entity.ProjectUser;
 import org.apache.dolphinscheduler.dao.entity.TaskInstance;
 import org.apache.dolphinscheduler.dao.entity.User;
 import org.apache.dolphinscheduler.dao.mapper.CommandMapper;
@@ -321,5 +322,11 @@ public class ProcessServiceTest {
         Mockito.when(processDefineMapper.selectById(222)).thenReturn(processDefinition2);
         processService.recurseFindSubProcessId(parentId, ids);
 
+    }
+
+    @Test
+    public void testQueryProjectWithUserByProcessInstanceId() {
+        ProjectUser projectUser = processService.queryProjectWithUserByProcessInstanceId(1);
+        Assert.assertNotNull(projectUser);
     }
 }

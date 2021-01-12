@@ -26,14 +26,16 @@ import org.apache.dolphinscheduler.dao.mapper.ProcessInstanceMapper;
 import org.apache.dolphinscheduler.dao.mapper.ProjectMapper;
 import org.apache.dolphinscheduler.dao.mapper.TaskInstanceMapper;
 import org.apache.dolphinscheduler.server.utils.AlertManager;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import org.junit.Assert;
 import org.junit.Ignore;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-
-import java.util.ArrayList;
-import java.util.List;
 
 
 /**
@@ -108,6 +110,32 @@ public class AlertManagerTest {
         ProjectUser projectUser = projectMapper.queryProjectWithUserByProcessInstanceId(processInstance.getId());
 
         alertManager.sendAlertProcessInstance(processInstance, toleranceTaskList, projectUser);
+    }
+
+    @Test
+    public void testGetContentProcessInstance() {
+        // process instance
+        ProcessInstance processInstance = processInstanceMapper.queryDetailById(13028);
+
+        // set process definition
+        ProcessDefinition processDefinition = processDefinitionMapper.selectById(47);
+        processInstance.setProcessDefinition(processDefinition);
+
+        // fault task instance
+        TaskInstance toleranceTask1 = taskInstanceMapper.selectById(5038);
+        toleranceTask1.setState(ExecutionStatus.FAILURE);
+        TaskInstance toleranceTask2 = taskInstanceMapper.selectById(5039);
+        toleranceTask2.setState(ExecutionStatus.FAILURE);
+
+        List<TaskInstance> toleranceTaskList = new ArrayList<>(2);
+        toleranceTaskList.add(toleranceTask1);
+        toleranceTaskList.add(toleranceTask2);
+
+        ProjectUser projectUser = projectMapper.queryProjectWithUserByProcessInstanceId(processInstance.getId());
+
+        //json
+        String res = alertManager.getContentProcessInstance(processInstance, toleranceTaskList, projectUser);
+        Assert.assertNotNull(res);
     }
 
 }
