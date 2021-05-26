@@ -21,7 +21,6 @@ import static org.apache.dolphinscheduler.common.Constants.CMDPARAM_COMPLEMENT_D
 import static org.apache.dolphinscheduler.common.Constants.CMDPARAM_COMPLEMENT_DATA_START_DATE;
 import static org.apache.dolphinscheduler.common.Constants.CMD_PARAM_RECOVER_PROCESS_ID_STRING;
 import static org.apache.dolphinscheduler.common.Constants.CMD_PARAM_START_NODE_NAMES;
-import static org.apache.dolphinscheduler.common.Constants.CMD_PARAM_START_PARAMS;
 import static org.apache.dolphinscheduler.common.Constants.MAX_TASK_TIMEOUT;
 
 import org.apache.dolphinscheduler.api.enums.ExecuteType;
@@ -113,7 +112,6 @@ public class ExecutorService extends BaseService {
      * @param workerGroup worker group name
      * @param runMode run mode
      * @param timeout timeout
-     * @param startParams the global param values which pass to new process instance
      * @return execute process instance code
      * @throws ParseException Parse Exception
      */
@@ -122,8 +120,7 @@ public class ExecutorService extends BaseService {
                                                    FailureStrategy failureStrategy, String startNodeList,
                                                    TaskDependType taskDependType, WarningType warningType, int warningGroupId,
                                                    String receivers, String receiversCc, RunMode runMode,
-                                                   Priority processInstancePriority, String workerGroup, Integer timeout,
-                                                   Map<String, String> startParams) throws ParseException {
+                                                   Priority processInstancePriority, String workerGroup, Integer timeout) throws ParseException {
         Map<String, Object> result = new HashMap<>();
         // timeout is invalid
         if (timeout <= 0 || timeout > MAX_TASK_TIMEOUT) {
@@ -160,7 +157,7 @@ public class ExecutorService extends BaseService {
          */
         int create = this.createCommand(commandType, processDefinitionId,
                 taskDependType, failureStrategy, startNodeList, cronTime, warningType, loginUser.getId(),
-                warningGroupId, runMode, processInstancePriority, workerGroup, startParams);
+                warningGroupId, runMode, processInstancePriority, workerGroup);
         if (create > 0) {
             /**
              * according to the process definition ID updateProcessInstance and CC recipient
@@ -505,8 +502,7 @@ public class ExecutorService extends BaseService {
                               TaskDependType nodeDep, FailureStrategy failureStrategy,
                               String startNodeList, String schedule, WarningType warningType,
                               int executorId, int warningGroupId,
-                              RunMode runMode, Priority processInstancePriority, String workerGroup,
-                              Map<String, String> startParams) throws ParseException {
+                              RunMode runMode, Priority processInstancePriority, String workerGroup) throws ParseException {
 
         /**
          * instantiate command schedule instance
@@ -532,9 +528,6 @@ public class ExecutorService extends BaseService {
         }
         if (warningType != null) {
             command.setWarningType(warningType);
-        }
-        if (startParams != null && startParams.size() > 0) {
-            cmdParam.put(CMD_PARAM_START_PARAMS, JSONUtils.toJsonString(startParams));
         }
         command.setCommandParam(JSONUtils.toJsonString(cmdParam));
         command.setExecutorId(executorId);
