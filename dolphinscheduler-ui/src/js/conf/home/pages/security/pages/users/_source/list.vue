@@ -48,7 +48,7 @@
             <span>{{scope.row.updateTime | formatDate}}</span>
           </template>
         </el-table-column>
-        <el-table-column :label="$t('Operation')" width="120" fixed="right">
+        <el-table-column :label="$t('Operation')" width="100" fixed="right">
           <template slot-scope="scope">
             <el-tooltip :content="$t('Authorize')" placement="top">
               <el-dropdown trigger="click">
@@ -64,7 +64,7 @@
             <el-tooltip :content="$t('Edit')" placement="top">
               <el-button type="primary" size="mini" icon="el-icon-edit-outline" @click="_edit(scope.row)" circle></el-button>
             </el-tooltip>
-            <el-tooltip :content="$t('delete')" placement="top">
+            <el-tooltip :content="$t('Delete')" placement="top">
               <el-popconfirm
                 :confirmButtonText="$t('Confirm')"
                 :cancelButtonText="$t('Cancel')"
@@ -81,24 +81,28 @@
       </el-table>
     </div>
     <el-dialog
+      v-if="authProjectDialog"
       :visible.sync="authProjectDialog"
       width="auto">
       <m-transfer :transferData="transferData" @onUpdateAuthProject="onUpdateAuthProject" @closeAuthProject="closeAuthProject"></m-transfer>
     </el-dialog>
 
     <el-dialog
+      v-if="authDataSourceDialog"
       :visible.sync="authDataSourceDialog"
       width="auto">
       <m-transfer :transferData="transferData" @onUpdateAuthDataSource="onUpdateAuthDataSource" @closeAuthDataSource="closeAuthDataSource"></m-transfer>
     </el-dialog>
 
     <el-dialog
+      v-if="authUdfFuncDialog"
       :visible.sync="authUdfFuncDialog"
       width="auto">
       <m-transfer :transferData="transferData" @onUpdateAuthUdfFunc="onUpdateAuthUdfFunc" @closeAuthUdfFunc="closeAuthUdfFunc"></m-transfer>
     </el-dialog>
 
     <el-dialog
+      v-if="resourceDialog"
       :visible.sync="resourceDialog"
       width="auto">
       <m-resource :resourceData="resourceData" @onUpdateAuthResource="onUpdateAuthResource" @closeAuthResource="closeAuthResource"></m-resource>

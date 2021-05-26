@@ -20,7 +20,7 @@
     <parent>
         <artifactId>dolphinscheduler</artifactId>
         <groupId>org.apache.dolphinscheduler</groupId>
-        <version>1.3.4-SNAPSHOT</version>
+        <version>${revision}</version>
     </parent>
     <modelVersion>4.0.0</modelVersion>
 
@@ -29,6 +29,7 @@
     <name>dolphinscheduler-service</name>
 
     <dependencies>
+        <!-- dolphinscheduler -->
         <dependency>
             <groupId>org.apache.dolphinscheduler</groupId>
             <artifactId>dolphinscheduler-remote</artifactId>
@@ -37,6 +38,7 @@
             <groupId>org.apache.dolphinscheduler</groupId>
             <artifactId>dolphinscheduler-dao</artifactId>
         </dependency>
+
         <dependency>
             <groupId>org.apache.curator</groupId>
             <artifactId>curator-client</artifactId>

@@ -21,9 +21,11 @@
         <template slot="button-group" v-if="isADMIN">
           <el-button size="mini" @click="_create('')">{{$t('Create alarm group')}}</el-button>
           <el-dialog
+            :title="item ? $t('Edit alarm group') : $t('Create alarm group')"
+            v-if="createWarningDialog"
             :visible.sync="createWarningDialog"
             width="auto">
-            <m-create-warning :item="item" @onUpdate="onUpdate" @close="close"></m-create-warning>
+            <m-create-warning :item="item" :allAlertPluginInstance="allAlertPluginInstance" @onUpdate="onUpdate" @close="close"></m-create-warning>
           </el-dialog>
         </template>
       </m-conditions>
@@ -83,13 +85,14 @@
         isLeft: true,
         isADMIN: store.state.user.userInfo.userType === 'ADMIN_USER',
         createWarningDialog: false,
-        item: {}
+        item: {},
+        allAlertPluginInstance: []
       }
     },
     mixins: [listUrlParamHandle],
     props: {},
     methods: {
-      ...mapActions('security', ['getAlertgroupP']),
+      ...mapActions('security', ['queryAlertGroupListPaging', 'queryAllAlertPluginInstance']),
       /**
        * Inquire
        */
@@ -110,19 +113,21 @@
         this._create(item)
       },
       _create (item) {
+        this.queryAllAlertPluginInstance().then(res => {
+          this.allAlertPluginInstance = res
+        }).catch(e => {
+          this.$message.error(e.msg)
+        })
         this.item = item
         this.createWarningDialog = true
       },
-
       onUpdate () {
         this._debounceGET('false')
         this.createWarningDialog = false
       },
-
       close () {
         this.createWarningDialog = false
       },
-
       _getList (flag) {
         if (sessionStorage.getItem('isLeft') === 0) {
           this.isLeft = false
@@ -130,7 +135,7 @@
           this.isLeft = true
         }
         this.isLoading = !flag
-        this.getAlertgroupP(this.searchParams).then(res => {
+        this.queryAlertGroupListPaging(this.searchParams).then(res => {
           if (this.searchParams.pageNo > 1 && res.totalList.length === 0) {
             this.searchParams.pageNo = this.searchParams.pageNo - 1
           } else {

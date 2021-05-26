@@ -47,10 +47,17 @@ public class ProcessInstance {
      */
     @TableId(value = "id", type = IdType.AUTO)
     private int id;
+
     /**
-     * process definition id
+     * process definition code
      */
-    private int processDefinitionId;
+    private Long processDefinitionCode;
+
+    /**
+     * process definition version
+     */
+    private int processDefinitionVersion;
+
     /**
      * process state
      */
@@ -145,7 +152,9 @@ public class ProcessInstance {
 
     /**
      * process instance json
+     * TODO delete
      */
+    @TableField(exist = false)
     private String processInstanceJson;
 
     /**
@@ -179,11 +188,13 @@ public class ProcessInstance {
     /**
      * task locations for web
      */
+    @TableField(exist = false)
     private String locations;
 
     /**
      * task connects for web
      */
+    @TableField(exist = false)
     private String connects;
 
     /**
@@ -194,6 +205,7 @@ public class ProcessInstance {
     /**
      * depend processes schedule time
      */
+    @TableField(exist = false)
     private String dependenceScheduleTimes;
 
     /**
@@ -202,7 +214,7 @@ public class ProcessInstance {
      * @return
      */
     @TableField(exist = false)
-    private Long duration;
+    private String duration;
 
     /**
      * process instance priority
@@ -228,18 +240,6 @@ public class ProcessInstance {
      * varPool string
      */
     private String varPool;
-    
-    /**
-     * receivers for api
-     */
-    @TableField(exist = false)
-    private String receivers;
-
-    /**
-     * receivers cc for api
-     */
-    @TableField(exist = false)
-    private String receiversCc;
 
     public ProcessInstance() {
 
@@ -268,7 +268,7 @@ public class ProcessInstance {
     public void setVarPool(String varPool) {
         this.varPool = varPool;
     }
-    
+
     public ProcessDefinition getProcessDefinition() {
         return processDefinition;
     }
@@ -283,14 +283,6 @@ public class ProcessInstance {
 
     public void setId(int id) {
         this.id = id;
-    }
-
-    public int getProcessDefinitionId() {
-        return processDefinitionId;
-    }
-
-    public void setProcessDefinitionId(int processDefinitionId) {
-        this.processDefinitionId = processDefinitionId;
     }
 
     public ExecutionStatus getState() {
@@ -559,11 +551,11 @@ public class ProcessInstance {
         this.dependenceScheduleTimes = dependenceScheduleTimes;
     }
 
-    public Long getDuration() {
+    public String getDuration() {
         return duration;
     }
 
-    public void setDuration(Long duration) {
+    public void setDuration(String duration) {
         this.duration = duration;
     }
 
@@ -591,27 +583,26 @@ public class ProcessInstance {
         this.tenantId = tenantId;
     }
 
-    public String getReceivers() {
-        return receivers;
+    public Long getProcessDefinitionCode() {
+        return processDefinitionCode;
     }
 
-    public void setReceivers(String receivers) {
-        this.receivers = receivers;
+    public void setProcessDefinitionCode(Long processDefinitionCode) {
+        this.processDefinitionCode = processDefinitionCode;
     }
 
-    public String getReceiversCc() {
-        return receiversCc;
+    public int getProcessDefinitionVersion() {
+        return processDefinitionVersion;
     }
 
-    public void setReceiversCc(String receiversCc) {
-        this.receiversCc = receiversCc;
+    public void setProcessDefinitionVersion(int processDefinitionVersion) {
+        this.processDefinitionVersion = processDefinitionVersion;
     }
 
     @Override
     public String toString() {
         return "ProcessInstance{"
                 + "id=" + id
-                + ", processDefinitionId=" + processDefinitionId
                 + ", state=" + state
                 + ", recovery=" + recovery
                 + ", startTime=" + startTime
@@ -679,11 +670,11 @@ public class ProcessInstance {
                 + timeout
                 + ", tenantId="
                 + tenantId
-                + ", receivers='"
-                + receivers
+                + ", processDefinitionCode='"
+                + processDefinitionCode
                 + '\''
-                + ", receiversCc='"
-                + receiversCc
+                + ", processDefinitionVersion='"
+                + processDefinitionVersion
                 + '\''
                 + '}';
     }
@@ -706,4 +697,5 @@ public class ProcessInstance {
     public int hashCode() {
         return Objects.hash(id);
     }
+
 }

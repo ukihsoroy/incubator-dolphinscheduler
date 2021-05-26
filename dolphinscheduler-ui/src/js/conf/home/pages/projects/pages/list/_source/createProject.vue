@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 <template>
-  <m-popup ref="popup" :nameText="item ? $t('Edit') : $t('Create Project')" :ok-text="item ? $t('Edit') : $t('Submit')"
+  <m-popover ref="popover" :nameText="item ? $t('Edit') : $t('Create Project')" :ok-text="item ? $t('Edit') : $t('Submit')"
            @close="_close" @ok="_ok">
     <template slot="content">
       <div class="projects-create-model">
@@ -25,6 +25,18 @@
             <el-input
               v-model="projectName"
               :placeholder="$t('Please enter name')"
+              maxlength="60"
+              size="small"
+              type="input">
+            </el-input>
+          </template>
+        </m-list-box-f>
+        <m-list-box-f v-if="item">
+          <template slot="name"><strong>*</strong>{{ $t('Owned Users') }}</template>
+          <template slot="content">
+            <el-input
+              v-model="userName"
+              :placeholder="$t('Please enter user name')"
               maxlength="60"
               size="small"
               type="input">
@@ -44,13 +56,13 @@
         </m-list-box-f>
       </div>
     </template>
-  </m-popup>
+  </m-popover>
 </template>
 <script>
   import _ from 'lodash'
   import i18n from '@/module/i18n'
   import store from '@/conf/home/store'
-  import mPopup from '@/module/components/popup/popup'
+  import mPopover from '@/module/components/popup/popover'
   import mListBoxF from '@/module/components/listBoxF/listBoxF'
 
   export default {
@@ -59,7 +71,8 @@
       return {
         store,
         description: '',
-        projectName: ''
+        projectName: '',
+        userName: ''
       }
     },
     props: {
@@ -73,7 +86,8 @@
 
         let param = {
           projectName: _.trim(this.projectName),
-          description: _.trim(this.description)
+          description: _.trim(this.description),
+          userName: _.trim(this.userName)
         }
 
         // edit
@@ -81,7 +95,7 @@
           param.projectId = this.item.id
         }
 
-        this.$refs.popup.spinnerLoading = true
+        this.$refs.popover.spinnerLoading = true
 
         this.store.dispatch(`projects/${this.item ? 'updateProjects' : 'createProjects'}`, param).then(res => {
           this.$emit('_onUpdate')
@@ -90,12 +104,10 @@
             type: 'success',
             offset: 70
           })
-          setTimeout(() => {
-            this.$refs.popup.spinnerLoading = false
-          }, 800)
+          this.$refs.popover.spinnerLoading = false
         }).catch(e => {
           this.$message.error(e.msg || '')
-          this.$refs.popup.spinnerLoading = false
+          this.$refs.popover.spinnerLoading = false
         })
       },
       _close () {
@@ -106,6 +118,10 @@
           this.$message.warning(`${i18n.$t('Please enter name')}`)
           return false
         }
+        if (this.item && !this.userName) {
+          this.$message.warning(`${i18n.$t('Please enter user name')}`)
+          return false
+        }
         return true
       }
     },
@@ -114,10 +130,11 @@
       if (this.item) {
         this.projectName = this.item.name
         this.description = this.item.description
+        this.userName = this.item.userName
       }
     },
     mounted () {
     },
-    components: { mPopup, mListBoxF }
+    components: { mPopover, mListBoxF }
   }
 </script>

@@ -22,11 +22,13 @@ import static org.apache.dolphinscheduler.common.Constants.CMDPARAM_COMPLEMENT_D
 import static org.apache.dolphinscheduler.common.Constants.CMD_PARAM_RECOVERY_START_NODE_STRING;
 import static org.apache.dolphinscheduler.common.Constants.CMD_PARAM_START_NODE_NAMES;
 import static org.apache.dolphinscheduler.common.Constants.DEFAULT_WORKER_GROUP;
+import static org.apache.dolphinscheduler.common.Constants.LOCAL_PARAMS;
 import static org.apache.dolphinscheduler.common.Constants.SEC_2_MINUTES_TIME_UNIT;
 
 import org.apache.dolphinscheduler.common.Constants;
 import org.apache.dolphinscheduler.common.enums.CommandType;
 import org.apache.dolphinscheduler.common.enums.DependResult;
+import org.apache.dolphinscheduler.common.enums.Direct;
 import org.apache.dolphinscheduler.common.enums.ExecutionStatus;
 import org.apache.dolphinscheduler.common.enums.FailureStrategy;
 import org.apache.dolphinscheduler.common.enums.Flag;
@@ -36,10 +38,10 @@ import org.apache.dolphinscheduler.common.graph.DAG;
 import org.apache.dolphinscheduler.common.model.TaskNode;
 import org.apache.dolphinscheduler.common.model.TaskNodeRelation;
 import org.apache.dolphinscheduler.common.process.ProcessDag;
+import org.apache.dolphinscheduler.common.process.Property;
 import org.apache.dolphinscheduler.common.thread.Stopper;
 import org.apache.dolphinscheduler.common.thread.ThreadUtils;
 import org.apache.dolphinscheduler.common.utils.CollectionUtils;
-import org.apache.dolphinscheduler.common.utils.CommonUtils;
 import org.apache.dolphinscheduler.common.utils.DateUtils;
 import org.apache.dolphinscheduler.common.utils.JSONUtils;
 import org.apache.dolphinscheduler.common.utils.OSUtils;
@@ -53,20 +55,17 @@ import org.apache.dolphinscheduler.dao.entity.TaskInstance;
 import org.apache.dolphinscheduler.dao.utils.DagHelper;
 import org.apache.dolphinscheduler.remote.NettyRemotingClient;
 import org.apache.dolphinscheduler.server.master.config.MasterConfig;
-import org.apache.dolphinscheduler.server.utils.AlertManager;
+import org.apache.dolphinscheduler.service.alert.ProcessAlertManager;
 import org.apache.dolphinscheduler.service.process.ProcessService;
 import org.apache.dolphinscheduler.service.quartz.cron.CronUtils;
 import org.apache.dolphinscheduler.service.queue.PeerTaskInstancePriorityQueue;
 
-import org.apache.commons.io.FileUtils;
-
-import java.io.File;
-import java.io.IOException;
 import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -149,7 +148,7 @@ public class MasterExecThread implements Runnable {
     /**
      * alert manager
      */
-    private AlertManager alertManager;
+    private ProcessAlertManager processAlertManager;
 
     /**
      * the object of DAG
@@ -175,19 +174,19 @@ public class MasterExecThread implements Runnable {
      *
      * @param parentNodeName parent node name
      */
-    private Map<String, Object> propToValue = new ConcurrentHashMap<String, Object>();
+    private Map<String, Object> propToValue = new ConcurrentHashMap<>();
 
     /**
      * constructor of MasterExecThread
      *
-     * @param processInstance     processInstance
-     * @param processService      processService
+     * @param processInstance processInstance
+     * @param processService processService
      * @param nettyRemotingClient nettyRemotingClient
      */
     public MasterExecThread(ProcessInstance processInstance
             , ProcessService processService
             , NettyRemotingClient nettyRemotingClient
-            , AlertManager alertManager
+            , ProcessAlertManager processAlertManager
             , MasterConfig masterConfig) {
         this.processService = processService;
 
@@ -197,7 +196,7 @@ public class MasterExecThread implements Runnable {
         this.taskExecService = ThreadUtils.newDaemonFixedThreadExecutor("Master-Task-Exec-Thread",
                 masterTaskExecNum);
         this.nettyRemotingClient = nettyRemotingClient;
-        this.alertManager = alertManager;
+        this.processAlertManager = processAlertManager;
     }
 
     @Override
@@ -231,8 +230,6 @@ public class MasterExecThread implements Runnable {
             processService.updateProcessInstance(processInstance);
         } finally {
             taskExecService.shutdown();
-            // post handle
-            postHandle();
         }
     }
 
@@ -261,7 +258,7 @@ public class MasterExecThread implements Runnable {
         processService.saveProcessInstance(processInstance);
 
         // get schedules
-        int processDefinitionId = processInstance.getProcessDefinitionId();
+        int processDefinitionId = processInstance.getProcessDefinition().getId();
         List<Schedule> schedules = processService.queryReleaseSchedulerListByProcessDefinitionId(processDefinitionId);
         List<Date> listDate = Lists.newLinkedList();
         if (!CollectionUtils.isEmpty(schedules)) {
@@ -271,7 +268,7 @@ public class MasterExecThread implements Runnable {
         }
         // get first fire date
         Iterator<Date> iterator = null;
-        Date scheduleDate = null;
+        Date scheduleDate;
         if (!CollectionUtils.isEmpty(listDate)) {
             iterator = listDate.iterator();
             scheduleDate = iterator.next();
@@ -285,9 +282,7 @@ public class MasterExecThread implements Runnable {
         }
 
         while (Stopper.isRunning()) {
-
-            logger.info("process {} start to complement {} data",
-                    processInstance.getId(), DateUtils.dateToString(scheduleDate));
+            logger.info("process {} start to complement {} data", processInstance.getId(), DateUtils.dateToString(scheduleDate));
             // prepare dag and other info
             prepareProcess();
 
@@ -305,8 +300,7 @@ public class MasterExecThread implements Runnable {
             endProcess();
             // process instance failure ，no more complements
             if (!processInstance.getState().typeIsSuccess()) {
-                logger.info("process {} state {}, complement not completely!",
-                        processInstance.getId(), processInstance.getState());
+                logger.info("process {} state {}, complement not completely!", processInstance.getId(), processInstance.getState());
                 break;
             }
             //  current process instance success ,next execute
@@ -373,7 +367,7 @@ public class MasterExecThread implements Runnable {
         }
         List<TaskInstance> taskInstances = processService.findValidTaskListByProcessId(processInstance.getId());
         ProjectUser projectUser = processService.queryProjectWithUserByProcessInstanceId(processInstance.getId());
-        alertManager.sendAlertProcessInstance(processInstance, taskInstances, projectUser);
+        processAlertManager.sendAlertProcessInstance(processInstance, taskInstances, projectUser);
     }
 
     /**
@@ -383,12 +377,18 @@ public class MasterExecThread implements Runnable {
      */
     private void buildFlowDag() throws Exception {
         recoverNodeIdList = getStartTaskInstanceList(processInstance.getCommandParam());
-
-        forbiddenTaskList = DagHelper.getForbiddenTaskNodeMaps(processInstance.getProcessInstanceJson());
+        List<TaskNode> taskNodeList =
+                processService.genTaskNodeList(processInstance.getProcessDefinitionCode(), processInstance.getProcessDefinitionVersion(), new HashMap<>());
+        forbiddenTaskList.clear();
+        taskNodeList.forEach(taskNode -> {
+            if (taskNode.isForbidden()) {
+                forbiddenTaskList.put(taskNode.getName(), taskNode);
+            }
+        });
         // generate process to get DAG info
         List<String> recoveryNameList = getRecoveryNodeNameList();
         List<String> startNodeNameList = parseStartNodeName(processInstance.getCommandParam());
-        ProcessDag processDag = generateFlowDag(processInstance.getProcessInstanceJson(),
+        ProcessDag processDag = generateFlowDag(taskNodeList,
                 startNodeNameList, recoveryNameList, processInstance.getTaskDependType());
         if (processDag == null) {
             logger.error("processDag is null");
@@ -423,27 +423,6 @@ public class MasterExecThread implements Runnable {
     }
 
     /**
-     * process post handle
-     */
-    private void postHandle() {
-        logger.info("develop mode is: {}", CommonUtils.isDevelopMode());
-
-        if (!CommonUtils.isDevelopMode()) {
-            // get exec dir
-            String execLocalPath = org.apache.dolphinscheduler.common.utils.FileUtils
-                    .getProcessExecDir(processInstance.getProcessDefinition().getProjectId(),
-                            processInstance.getProcessDefinitionId(),
-                            processInstance.getId());
-
-            try {
-                FileUtils.deleteDirectory(new File(execLocalPath));
-            } catch (IOException e) {
-                logger.error("delete exec dir failed ", e);
-            }
-        }
-    }
-
-    /**
      * submit task to execute
      *
      * @param taskInstance task instance
@@ -469,13 +448,14 @@ public class MasterExecThread implements Runnable {
      * find task instance in db.
      * in case submit more than one same name task in the same time.
      *
-     * @param taskName task name
+     * @param taskCode task code
+     * @param taskVersion task version
      * @return TaskInstance
      */
-    private TaskInstance findTaskIfExists(String taskName) {
+    private TaskInstance findTaskIfExists(Long taskCode, int taskVersion) {
         List<TaskInstance> taskInstanceList = processService.findValidTaskListByProcessId(this.processInstance.getId());
         for (TaskInstance taskInstance : taskInstanceList) {
-            if (taskInstance.getName().equals(taskName)) {
+            if (taskInstance.getTaskCode() == taskCode && taskInstance.getTaskDefinitionVersion() == taskVersion) {
                 return taskInstance;
             }
         }
@@ -486,27 +466,25 @@ public class MasterExecThread implements Runnable {
      * encapsulation task
      *
      * @param processInstance process instance
-     * @param nodeName        node name
+     * @param taskNode taskNode
      * @return TaskInstance
      */
-    private TaskInstance createTaskInstance(ProcessInstance processInstance, String nodeName,
-                                            TaskNode taskNode) {
-
-        TaskInstance taskInstance = findTaskIfExists(nodeName);
+    private TaskInstance createTaskInstance(ProcessInstance processInstance, TaskNode taskNode) {
+        //update processInstance for update the globalParams
+        this.processInstance = this.processService.findProcessInstanceById(this.processInstance.getId());
+        TaskInstance taskInstance = findTaskIfExists(taskNode.getCode(), taskNode.getVersion());
         if (taskInstance == null) {
             taskInstance = new TaskInstance();
+            taskInstance.setTaskCode(taskNode.getCode());
+            taskInstance.setTaskDefinitionVersion(taskNode.getVersion());
             // task name
-            taskInstance.setName(nodeName);
-            // process instance define id
-            taskInstance.setProcessDefinitionId(processInstance.getProcessDefinitionId());
+            taskInstance.setName(taskNode.getName());
             // task instance state
             taskInstance.setState(ExecutionStatus.SUBMITTED_SUCCESS);
             // process instance id
             taskInstance.setProcessInstanceId(processInstance.getId());
-            // task instance node json
-            taskInstance.setTaskJson(JSONUtils.toJsonString(taskNode));
             // task instance type
-            taskInstance.setTaskType(taskNode.getType());
+            taskInstance.setTaskType(taskNode.getType().toUpperCase());
             // task instance whether alert
             taskInstance.setAlertFlag(Flag.NO);
 
@@ -540,11 +518,42 @@ public class MasterExecThread implements Runnable {
             } else {
                 taskInstance.setWorkerGroup(taskWorkerGroup);
             }
-
+            taskInstance.setTaskParams(globalParamToTaskParams(taskNode.getTaskParams()));
             // delay execution time
             taskInstance.setDelayTime(taskNode.getDelayTime());
         }
         return taskInstance;
+    }
+
+    private String globalParamToTaskParams(String params) {
+        String globalParams = this.processInstance.getGlobalParams();
+        if (StringUtils.isBlank(globalParams)) {
+            return params;
+        }
+        Map<String, String> globalMap = processService.getGlobalParamMap(globalParams);
+        if (globalMap == null || globalMap.size() == 0) {
+            return params;
+        }
+        // the process global param save in localParams
+        Map<String, Object> result = JSONUtils.toMap(params, String.class, Object.class);
+        Object localParams = result.get(LOCAL_PARAMS);
+        if (localParams != null) {
+            List<Property> allParam = JSONUtils.toList(JSONUtils.toJsonString(localParams), Property.class);
+            for (Property info : allParam) {
+                String paramName = info.getProp();
+                if (StringUtils.isNotEmpty(paramName) && propToValue.containsKey(paramName)) {
+                    info.setValue((String) propToValue.get(paramName));
+                }
+                if (info.getDirect().equals(Direct.IN)) {
+                    String value = globalMap.get(paramName);
+                    if (StringUtils.isNotEmpty(value)) {
+                        info.setValue(value);
+                    }
+                }
+            }
+            result.put(LOCAL_PARAMS, allParam);
+        }
+        return JSONUtils.toJsonString(result);
     }
 
     private void submitPostNode(String parentNodeName) {
@@ -558,9 +567,7 @@ public class MasterExecThread implements Runnable {
                 throw new RuntimeException();
             }
             TaskNode taskNodeObject = dag.getNode(taskNode);
-            VarPoolUtils.setTaskNodeLocalParams(taskNodeObject, propToValue);
-            taskInstances.add(createTaskInstance(processInstance, taskNode,
-                    taskNodeObject));
+            taskInstances.add(createTaskInstance(processInstance, taskNodeObject));
         }
 
         // if previous node success , post node submit
@@ -608,7 +615,7 @@ public class MasterExecThread implements Runnable {
             }
             ExecutionStatus depTaskState = completeTaskList.get(depsNode).getState();
             if (depTaskState.typeIsPause() || depTaskState.typeIsCancel()) {
-                return DependResult.WAITING;
+                return DependResult.NON_EXEC;
             }
             // ignore task state if current task is condition
             if (taskNode.isConditionsTask()) {
@@ -878,7 +885,7 @@ public class MasterExecThread implements Runnable {
         try {
             readyToSubmitTaskQueue.put(taskInstance);
         } catch (Exception e) {
-            logger.error("add task instance to readyToSubmitTaskQueue error");
+            logger.error("add task instance to readyToSubmitTaskQueue error, taskName: {}", taskInstance.getName(), e);
         }
     }
 
@@ -892,7 +899,7 @@ public class MasterExecThread implements Runnable {
         try {
             readyToSubmitTaskQueue.remove(taskInstance);
         } catch (Exception e) {
-            logger.error("remove task instance from readyToSubmitTaskQueue error");
+            logger.error("remove task instance from readyToSubmitTaskQueue error, taskName: {}", taskInstance.getName(), e);
         }
     }
 
@@ -921,8 +928,9 @@ public class MasterExecThread implements Runnable {
 
             // send warning email if process time out.
             if (!sendTimeWarning && checkProcessTimeOut(processInstance)) {
-                alertManager.sendProcessTimeoutAlert(processInstance,
-                        processService.findProcessDefineById(processInstance.getProcessDefinitionId()));
+                processAlertManager.sendProcessTimeoutAlert(processInstance,
+                        processService.findProcessDefinition(processInstance.getProcessDefinitionCode(),
+                        processInstance.getProcessDefinitionVersion()));
                 sendTimeWarning = true;
             }
             for (Map.Entry<MasterBaseTaskExecThread, Future<Boolean>> entry : activeTaskNode.entrySet()) {
@@ -951,6 +959,7 @@ public class MasterExecThread implements Runnable {
                         task.getName(), task.getId(), task.getState());
                 // node success , post node submit
                 if (task.getState() == ExecutionStatus.SUCCESS) {
+                    processInstance = processService.findProcessInstanceById(processInstance.getId());
                     processInstance.setVarPool(task.getVarPool());
                     processService.updateProcessInstance(processInstance);
                     completeTaskList.put(task.getName(), task);
@@ -983,7 +992,7 @@ public class MasterExecThread implements Runnable {
             }
             // send alert
             if (CollectionUtils.isNotEmpty(this.recoverToleranceFaultTaskList)) {
-                alertManager.sendAlertWorkerToleranceFault(processInstance, recoverToleranceFaultTaskList);
+                processAlertManager.sendAlertWorkerToleranceFault(processInstance, recoverToleranceFaultTaskList);
                 this.recoverToleranceFaultTaskList.clear();
             }
             // updateProcessInstance completed task status
@@ -1138,6 +1147,10 @@ public class MasterExecThread implements Runnable {
                     dependFailedTask.put(task.getName(), task);
                     removeTaskFromStandbyList(task);
                     logger.info("task {},id:{} depend result : {}", task.getName(), task.getId(), dependResult);
+                } else if (DependResult.NON_EXEC == dependResult) {
+                    // for some reasons(depend task pause/stop) this task would not be submit
+                    removeTaskFromStandbyList(task);
+                    logger.info("remove task {},id:{} , because depend result : {}", task.getName(), task.getId(), dependResult);
                 }
             }
         } catch (Exception e) {
@@ -1229,17 +1242,17 @@ public class MasterExecThread implements Runnable {
     /**
      * generate flow dag
      *
-     * @param processDefinitionJson process definition json
-     * @param startNodeNameList     start node name list
-     * @param recoveryNodeNameList  recovery node name list
-     * @param depNodeType           depend node type
+     * @param totalTaskNodeList total task node list
+     * @param startNodeNameList start node name list
+     * @param recoveryNodeNameList recovery node name list
+     * @param depNodeType depend node type
      * @return ProcessDag           process dag
      * @throws Exception exception
      */
-    public ProcessDag generateFlowDag(String processDefinitionJson,
+    public ProcessDag generateFlowDag(List<TaskNode> totalTaskNodeList,
                                       List<String> startNodeNameList,
                                       List<String> recoveryNodeNameList,
                                       TaskDependType depNodeType) throws Exception {
-        return DagHelper.generateFlowDag(processDefinitionJson, startNodeNameList, recoveryNodeNameList, depNodeType);
+        return DagHelper.generateFlowDag(totalTaskNodeList, startNodeNameList, recoveryNodeNameList, depNodeType);
     }
 }

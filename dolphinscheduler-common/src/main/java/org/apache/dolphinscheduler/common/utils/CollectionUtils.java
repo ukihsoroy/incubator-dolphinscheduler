@@ -27,6 +27,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 /**
  * Provides utility methods and decorators for {@link Collection} instances.
@@ -45,6 +47,11 @@ public class CollectionUtils {
     private CollectionUtils() {
         throw new UnsupportedOperationException("Construct CollectionUtils");
     }
+
+    /**
+     * The load factor used when none specified in constructor.
+     */
+    static final float DEFAULT_LOAD_FACTOR = 0.75f;
 
     /**
      * Returns a new {@link Collection} containing <i>a</i> minus a subset of
@@ -95,6 +102,7 @@ public class CollectionUtils {
      * @return string to map
      */
     public static Map<String, String> stringToMap(String str, String separator, String keyPrefix) {
+
         Map<String, String> emptyMap = new HashMap<>(0);
         if (StringUtils.isEmpty(str)) {
             return emptyMap;
@@ -103,7 +111,8 @@ public class CollectionUtils {
             return emptyMap;
         }
         String[] strings = str.split(separator);
-        Map<String, String> map = new HashMap<>(strings.length);
+        int initialCapacity = (int)(strings.length / DEFAULT_LOAD_FACTOR) + 1;
+        Map<String, String> map = new HashMap<>(initialCapacity);
         for (int i = 0; i < strings.length; i++) {
             String[] strArray = strings[i].split("=");
             if (strArray.length != 2) {
@@ -117,6 +126,38 @@ public class CollectionUtils {
             }
         }
         return map;
+    }
+
+    /**
+     * Transform item in collection
+     *
+     * @param collection origin collection
+     * @param transformFunc transform function
+     * @param <R> origin item type
+     * @param <T> target type
+     * @return transform list
+     */
+    public static <R, T> List<T> transformToList(Collection<R> collection, Function<R, T> transformFunc) {
+        if (isEmpty(collection)) {
+            return new ArrayList<>();
+        }
+        return collection.stream().map(transformFunc).collect(Collectors.toList());
+    }
+
+    /**
+     * Collect collection to map
+     *
+     * @param collection origin collection
+     * @param keyTransformFunction key transform function
+     * @param <K> target k type
+     * @param <V> value
+     * @return map
+     */
+    public static <K, V> Map<K, V> collectionToMap(Collection<V> collection, Function<V, K> keyTransformFunction) {
+        if (isEmpty(collection)) {
+            return new HashMap<>();
+        }
+        return collection.stream().collect(Collectors.toMap(keyTransformFunction, Function.identity()));
     }
 
     /**
@@ -263,13 +304,13 @@ public class CollectionUtils {
         }
         Map<String, Object> instanceMap;
         for (T instance : originList) {
-            Map<String, Object> dataMap = new BeanMap(instance);
+            BeanMap beanMap = new BeanMap(instance);
             instanceMap = new LinkedHashMap<>(16, 0.75f, true);
-            for (Map.Entry<String, Object> entry : dataMap.entrySet()) {
+            for (Map.Entry<Object, Object> entry : beanMap.entrySet()) {
                 if (exclusionSet.contains(entry.getKey())) {
                     continue;
                 }
-                instanceMap.put(entry.getKey(), entry.getValue());
+                instanceMap.put((String) entry.getKey(), entry.getValue());
             }
             instanceList.add(instanceMap);
         }

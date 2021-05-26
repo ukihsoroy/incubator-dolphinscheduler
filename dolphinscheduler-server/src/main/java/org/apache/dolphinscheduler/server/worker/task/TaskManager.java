@@ -17,23 +17,23 @@
 
 package org.apache.dolphinscheduler.server.worker.task;
 
-import org.apache.dolphinscheduler.common.enums.TaskType;
-import org.apache.dolphinscheduler.common.utils.EnumUtils;
 import org.apache.dolphinscheduler.server.entity.TaskExecutionContext;
 import org.apache.dolphinscheduler.server.worker.task.datax.DataxTask;
 import org.apache.dolphinscheduler.server.worker.task.flink.FlinkTask;
 import org.apache.dolphinscheduler.server.worker.task.http.HttpTask;
 import org.apache.dolphinscheduler.server.worker.task.mr.MapReduceTask;
-import org.apache.dolphinscheduler.server.worker.task.processdure.ProcedureTask;
+import org.apache.dolphinscheduler.server.worker.task.procedure.ProcedureTask;
 import org.apache.dolphinscheduler.server.worker.task.python.PythonTask;
 import org.apache.dolphinscheduler.server.worker.task.shell.ShellTask;
 import org.apache.dolphinscheduler.server.worker.task.spark.SparkTask;
 import org.apache.dolphinscheduler.server.worker.task.sql.SqlTask;
 import org.apache.dolphinscheduler.server.worker.task.sqoop.SqoopTask;
+import org.apache.dolphinscheduler.service.alert.AlertClientService;
+
 import org.slf4j.Logger;
 
 /**
- * task manaster
+ * task manager
  */
 public class TaskManager {
 
@@ -44,36 +44,36 @@ public class TaskManager {
      * @return AbstractTask
      * @throws IllegalArgumentException illegal argument exception
      */
-    public static AbstractTask newTask(TaskExecutionContext taskExecutionContext, Logger logger) throws IllegalArgumentException {
-        TaskType anEnum = EnumUtils.getEnum(TaskType.class, taskExecutionContext.getTaskType());
-        if (anEnum == null) {
-            logger.error("not support task type: {}", taskExecutionContext.getTaskType());
-            throw new IllegalArgumentException("not support task type");
+    public static AbstractTask newTask(TaskExecutionContext taskExecutionContext, Logger logger, AlertClientService alertClientService) throws IllegalArgumentException {
+        String taskType = taskExecutionContext.getTaskType();
+        if (taskType == null) {
+            logger.error("task type is null");
+            throw new IllegalArgumentException("task type is null");
         }
-        switch (anEnum) {
-            case SHELL:
-            case WATERDROP:
+        switch (taskType) {
+            case "SHELL":
+            case "WATERDROP":
                 return new ShellTask(taskExecutionContext, logger);
-            case PROCEDURE:
+            case "PROCEDURE":
                 return new ProcedureTask(taskExecutionContext, logger);
-            case SQL:
-                return new SqlTask(taskExecutionContext, logger);
-            case MR:
+            case "SQL":
+                return new SqlTask(taskExecutionContext, logger, alertClientService);
+            case "MR":
                 return new MapReduceTask(taskExecutionContext, logger);
-            case SPARK:
+            case "SPARK":
                 return new SparkTask(taskExecutionContext, logger);
-            case FLINK:
+            case "FLINK":
                 return new FlinkTask(taskExecutionContext, logger);
-            case PYTHON:
+            case "PYTHON":
                 return new PythonTask(taskExecutionContext, logger);
-            case HTTP:
+            case "HTTP":
                 return new HttpTask(taskExecutionContext, logger);
-            case DATAX:
+            case "DATAX":
                 return new DataxTask(taskExecutionContext, logger);
-            case SQOOP:
+            case "SQOOP":
                 return new SqoopTask(taskExecutionContext, logger);
             default:
-                logger.error("not support task type: {}", taskExecutionContext.getTaskType());
+                logger.error("not support task type: {}", taskType);
                 throw new IllegalArgumentException("not support task type");
         }
     }

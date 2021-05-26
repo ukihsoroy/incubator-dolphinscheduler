@@ -573,7 +573,7 @@ JSP.prototype.copyNodes = function ($id) {
 JSP.prototype.handleEventScreen = function ({ item, is }) {
   let screenOpen = true
   if (is) {
-    item.icon = 'el-icon-minus'
+    item.icon = 'el-icon-aim'
     screenOpen = true
   } else {
     item.icon = 'el-icon-full-screen'
@@ -616,7 +616,8 @@ JSP.prototype.saveStore = function () {
         }
 
         let tasksParam = _.assign(v, {
-          preTasks: preTasks
+          preTasks: preTasks,
+          depList: null
         })
 
         // Sub-workflow has no retries and interval
@@ -627,6 +628,7 @@ JSP.prototype.saveStore = function () {
         tasks.push(tasksParam)
       }
     })
+
     if (store.state.dag.connects.length === this.JspInstance.getConnections().length) {
       _.map(store.state.dag.connects, u => {
         connects.push({
@@ -651,6 +653,14 @@ JSP.prototype.saveStore = function () {
         })
       })
     } else if (store.state.dag.connects.length === 0) {
+      _.map(this.JspInstance.getConnections(), v => {
+        connects.push({
+          endPointSourceId: v.sourceId,
+          endPointTargetId: v.targetId,
+          label: v._jsPlumb.overlays.label.canvas.innerText
+        })
+      })
+    } else if (store.state.dag.connects.length > this.JspInstance.getConnections().length) {
       _.map(this.JspInstance.getConnections(), v => {
         connects.push({
           endPointSourceId: v.sourceId,

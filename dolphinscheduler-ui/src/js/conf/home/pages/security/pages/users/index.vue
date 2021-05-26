@@ -21,6 +21,8 @@
         <template slot="button-group" v-if="userList.length">
           <el-button size="mini" @click="_create('')">{{$t('Create User')}}</el-button>
           <el-dialog
+            :title="item ? $t('Edit User') : $t('Create User')"
+            v-if="createUserDialog"
             :visible.sync="createUserDialog"
             width="auto">
             <m-create-user :item="item" @onUpdate="onUpdate" @close="close"></m-create-user>
@@ -111,16 +113,13 @@
         this.item = item
         this.createUserDialog = true
       },
-
       onUpdate () {
         this._debounceGET('false')
         this.createUserDialog = false
       },
-
       close () {
         this.createUserDialog = false
       },
-
       _getList (flag) {
         if (sessionStorage.getItem('isLeft') === 0) {
           this.isLeft = false
