@@ -18,7 +18,6 @@ package org.apache.dolphinscheduler.dao.mapper;
 
 
 import org.apache.dolphinscheduler.dao.entity.Project;
-import org.apache.dolphinscheduler.dao.entity.ProjectUser;
 import org.apache.dolphinscheduler.dao.entity.User;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
@@ -197,12 +196,4 @@ public class ProjectMapperTest {
 
         Assert.assertNotEquals(projects.size(), 0);
     }
-
-
-    @Test
-    public void testQueryProjectWithUserByProcessInstanceId() {
-        ProjectUser projectUser = projectMapper.queryProjectWithUserByProcessInstanceId(1);
-        Assert.assertNotNull(projectUser);
-    }
-
 }
